@@ -26,24 +26,39 @@ import java.util.jar.JarEntry
 import org.apache.beam.sdk.options.PipelineOptions
 import com.spotify.scio.{ScioContext, ScioExecutionContext}
 
+import org.apache.beam.runners.dataflow.options.DataflowPipelineWorkerPoolOptions
+
 import scala.reflect.io.AbstractFile
 import scala.reflect.io.Path
+
+import scala.jdk.CollectionConverters._
 
 object ReplScioContext {
   private[this] val ReplJarName = "scio-repl-session.jar"
 
   final def apply(options: PipelineOptions, outputDir: String): ReplScioContext = {
     val tempJar = new File(Files.createTempDirectory("scio-repl-").toFile, ReplJarName)
+    println(s"***** ${tempJar.getAbsolutePath} *****")
     new ReplScioContext(options, outputDir, tempJar)
   }
 }
 
 class ReplScioContext private (options: PipelineOptions, replOutputDir: String, tempJar: File)
-    extends ScioContext(options, List(tempJar.toString())) {
+    extends ScioContext(options, Nil) {
 
   /** Enhanced version that dumps REPL session jar. */
   override def run(): ScioExecutionContext = {
     createJar()
+    val dataflowOptions = options.as(classOf[DataflowPipelineWorkerPoolOptions])
+    val localArtifacts = dataflowOptions.getFilesToStage() match {
+      case null => Nil
+      case l    => l.asScala
+    }
+    val filesToStage = (localArtifacts ++ List(tempJar.toString()))
+    println("****")
+    filesToStage.foreach(println(_))
+
+    dataflowOptions.setFilesToStage(new java.util.ArrayList(filesToStage.asJavaCollection))
     super.run()
   }
 
