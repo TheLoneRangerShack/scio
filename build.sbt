@@ -86,6 +86,7 @@ val protobufVersion = "3.21.12"
 
 val algebirdVersion = "0.13.9"
 val algebraVersion = "2.9.0"
+val ammoniteVersion = "2.5.8"
 val annoy4sVersion = "0.10.0"
 val annoyVersion = "0.2.6"
 val breezeVersion = "2.1.0"
@@ -1167,6 +1168,7 @@ lazy val `scio-repl`: Project = project
         "org.hamcrest" % "hamcrest-core"
       ),
       "org.apache.commons" % "commons-text" % commonsTextVersion,
+      "com.lihaoyi" % "ammonite" % ammoniteVersion cross CrossVersion.full,
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
@@ -1227,7 +1229,9 @@ lazy val `scio-repl`: Project = project
           MergeStrategy.filterDistinctLines
         case s => old(s)
       }
-    }
+    },
+    connectInput := true,
+    outputStrategy := Some(StdoutOutput)
   )
 
 lazy val `scio-jmh`: Project = project
