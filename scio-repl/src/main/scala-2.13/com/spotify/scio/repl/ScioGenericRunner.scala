@@ -17,9 +17,11 @@
 
 package com.spotify.scio.repl
 
+import ammonite.Main
+
 import scala.tools.nsc.{GenericRunnerCommand, MainGenericRunner}
 
-trait ScioGenericRunner extends MainGenericRunner {
+class ScioMain extends Main {
 
   /**
    * The main entry point for executing the REPL.
@@ -33,7 +35,7 @@ trait ScioGenericRunner extends MainGenericRunner {
    * @return
    *   `true` if execution was successful, `false` otherwise
    */
-  override def process(args: Array[String]): Boolean = {
+  def process(args: Array[String]): Boolean = {
     val command = new GenericRunnerCommand(args.toList, _ => ())
 
     val fromSbt = Thread.currentThread.getStackTrace.exists { elem =>
