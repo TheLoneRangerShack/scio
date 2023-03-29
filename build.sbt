@@ -86,6 +86,7 @@ val protobufVersion = "3.21.12"
 
 val algebirdVersion = "0.13.9"
 val algebraVersion = "2.9.0"
+val almondVersion = "0.13.4"
 val ammoniteVersion = "2.5.8"
 val annoy4sVersion = "0.10.0"
 val annoyVersion = "0.2.6"
@@ -1257,6 +1258,52 @@ lazy val `scio-jmh`: Project = project
     ),
     publish / skip := true,
     mimaPreviousArtifacts := Set.empty
+  )
+
+lazy val `scio-jupyter`: Project = project
+  .in(file("scio-jupyter"))
+  .dependsOn(
+    `scio-core`,
+    `scio-google-cloud-platform`,
+    `scio-extra`
+  )
+  .settings(commonSettings)
+  .settings(publishSettings)
+  .settings(macroSettings)
+  .settings(beamRunnerSettings)
+  .settings(
+    description := "Scio context for use in jupyter notebooks",
+    resolvers += "jitpack" at "https://jitpack.io",
+    beamRunners := "DataflowRunner,DirectRunner",
+    libraryDependencies ++= Seq(
+      ("com.lihaoyi" % "ammonite-interp" % ammoniteVersion % Provided).cross(CrossVersion.full),
+      ("com.lihaoyi" % "ammonite-repl" % ammoniteVersion % Provided).cross(CrossVersion.full),
+      ("sh.almond" % "scala-kernel-api" % almondVersion % Provided).cross(CrossVersion.full),
+      "com.google.guava" % "guava" % guavaVersion,
+      "org.apache.avro" % "avro" % avroVersion,
+      "org.apache.beam" % "beam-sdks-java-core" % beamVersion excludeAll (
+        "com.google.cloud.bigdataoss" % "gcsio"
+        ),
+      "org.apache.beam" % "beam-sdks-java-extensions-google-cloud-platform-core" % beamVersion,
+      "org.apache.beam" % "beam-sdks-java-io-google-cloud-platform" % beamVersion excludeAll(
+        // remove transitive test dependencies at compile time
+        "junit" % "junit",
+        "org.hamcrest" % "hamcrest-core"
+      ),
+      "org.apache.commons" % "commons-text" % commonsTextVersion,
+      "org.scala-lang" % "scala-compiler" % scalaVersion.value,
+      "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
+      "org.slf4j" % "slf4j-api" % slf4jVersion,
+      // runtime
+      "org.apache.beam" % "beam-runners-direct-java" % beamVersion % Runtime,
+      "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % beamVersion % Runtime excludeAll(
+        "com.google.cloud.bigdataoss" % "gcsio",
+        // remove transitive test dependencies at compile time
+        "junit" % "junit",
+        "org.hamcrest" % "hamcrest-core"
+      ),
+      "org.slf4j" % "slf4j-simple" % slf4jVersion % Runtime
+    )
   )
 
 lazy val `scio-smb`: Project = project
