@@ -7,7 +7,8 @@ import com.spotify.scio.jupyter.JupyterResourcesDetector.JupyterResourcesDetecto
 import com.spotify.scio.{ScioContext, ScioExecutionContext, ScioResult}
 import org.apache.beam.runners.core.construction.resources.PipelineResourcesOptions
 import org.apache.beam.sdk.options.PipelineOptions
-import org.apache.beam.sdk.options.DataflowPipelineOptions
+import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions
+import scala.jdk.CollectionConverters._
 
 import java.io.{File, FileOutputStream}
 import java.nio.file.{Files, Path, Paths}
