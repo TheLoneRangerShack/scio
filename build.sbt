@@ -96,8 +96,9 @@ val protobufVersion = "3.23.2"
 
 val algebirdVersion = "0.13.10"
 val algebraVersion = "2.9.0"
-val almondVersion = "0.13.4"
-val ammoniteVersion = "2.5.8"
+val almondVersion = "0.13.14"
+val ammoniteVersion2_12 = "2.5.8"
+val ammoniteVersion2_13 = "2.5.11"
 val annoy4sVersion = "0.10.0"
 val annoyVersion = "0.2.6"
 val breezeVersion = "2.1.0"
@@ -531,7 +532,8 @@ lazy val root: Project = Project("scio", file("."))
     `scio-repl`,
     `scio-smb`,
     `scio-tensorflow`,
-    `scio-test`
+    `scio-test`,
+    `scio-jupyter`
   )
 
 lazy val `scio-core`: Project = project
@@ -1249,7 +1251,6 @@ lazy val `scio-repl`: Project = project
         "org.hamcrest" % "hamcrest-core"
       ),
       "org.apache.commons" % "commons-text" % commonsTextVersion,
-      "com.lihaoyi" % "ammonite" % ammoniteVersion cross CrossVersion.full,
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
@@ -1261,9 +1262,13 @@ lazy val `scio-repl`: Project = project
     libraryDependencies ++= {
       VersionNumber(scalaVersion.value) match {
         case v if v.matchesSemVer(SemanticSelector("2.12.x")) =>
-          Seq("org.scalamacros" % "paradise" % scalaMacrosVersion cross CrossVersion.full)
+          Seq("org.scalamacros" % "paradise" % scalaMacrosVersion cross CrossVersion.full,
+            "com.lihaoyi" % "ammonite" % ammoniteVersion2_12 cross CrossVersion.full
+          )
         case _ =>
-          Nil
+          Seq(
+            "com.lihaoyi" % "ammonite" % ammoniteVersion2_13 cross CrossVersion.full,
+          )
       }
     },
     assembly / assemblyJarName := "scio-repl.jar",
@@ -1363,9 +1368,7 @@ lazy val `scio-jupyter`: Project = project
     resolvers += "jitpack" at "https://jitpack.io",
     beamRunners := "DataflowRunner,DirectRunner",
     libraryDependencies ++= Seq(
-      ("com.lihaoyi" % "ammonite-interp" % ammoniteVersion % Provided).cross(CrossVersion.full),
-      ("com.lihaoyi" % "ammonite-repl" % ammoniteVersion % Provided).cross(CrossVersion.full),
-      ("sh.almond" % "scala-kernel-api" % almondVersion % Provided).cross(CrossVersion.full),
+      //("sh.almond" % "scala-kernel-api" % almondVersion % Provided).cross(CrossVersion.binary),
       "com.google.guava" % "guava" % guavaVersion,
       "org.apache.avro" % "avro" % avroVersion,
       "org.apache.beam" % "beam-sdks-java-core" % beamVersion excludeAll (
@@ -1390,7 +1393,24 @@ lazy val `scio-jupyter`: Project = project
         "org.hamcrest" % "hamcrest-core"
       ),
       "org.slf4j" % "slf4j-simple" % slf4jVersion % Runtime
-    )
+    ),
+    libraryDependencies ++= {
+      VersionNumber(scalaVersion.value) match {
+        case v if v.matchesSemVer(SemanticSelector("2.12.x")) =>
+          Seq(
+            ("com.lihaoyi" % "ammonite" % ammoniteVersion2_12 % Provided).cross(CrossVersion.full)
+            //("com.lihaoyi" % "ammonite-repl" % ammoniteVersion2_12 % Provided).cross
+            //(CrossVersion.full)
+          )
+        case _ =>
+          Seq(
+            ("com.lihaoyi" % "ammonite" % ammoniteVersion2_13 % Provided).cross
+            (CrossVersion.full)
+            //("com.lihaoyi" % "ammonite-repl" % ammoniteVersion2_13 % Provided).cross(CrossVersion
+            //  .full)
+          )
+      }
+    },
   )
 
 lazy val `scio-smb`: Project = project
