@@ -23,7 +23,13 @@ class JupyterScioContext private[scio](
   replApi: ReplAPI
 ) extends ScioContext(options, List(replJarPath.toString)) {
 
-  println("It's the latest")
+  println("It's the latest!")
+  println("******REPL")
+  println(s"REPL Jar Path: $replJarPath")
+  println("******ARTIFACTS START")
+  artifacts.foreach(println)
+  println("******ARTIFACTS END")
+
 
   Try(optionsAs[PipelineResourcesOptions]) match {
     case Success(resourceOptions) =>
@@ -67,12 +73,14 @@ class JupyterScioContext private[scio](
     jarStream: JarOutputStream
   ): Unit = dir.foreach { file =>
     if (file.isDirectory) {
+      println(s"*****DIRECTORY $file")
       // Recursively descend into subdirectories, adjusting the package name as we do.
       val dirPath = entryPath + file.name + "/"
       jarStream.putNextEntry(new JarEntry(dirPath))
       jarStream.closeEntry()
       addVirtualDirectoryToJar(file, dirPath, jarStream)
     } else if (file.hasExtension("class")) {
+      println(s"*****CLASS $file")
       // Add class files as an entry in the jar file and write the class to the jar.
       println(entryPath + file.name)
       jarStream.putNextEntry(new JarEntry(entryPath + file.name))
