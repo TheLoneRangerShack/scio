@@ -7,6 +7,7 @@ import com.spotify.scio.jupyter.JupyterResourcesDetector.JupyterResourcesDetecto
 import com.spotify.scio.{ScioContext, ScioExecutionContext, ScioResult}
 import org.apache.beam.runners.core.construction.resources.PipelineResourcesOptions
 import org.apache.beam.sdk.options.PipelineOptions
+import org.apache.beam.sdk.options.DataflowPipelineOptions
 
 import java.io.{File, FileOutputStream}
 import java.nio.file.{Files, Path, Paths}
@@ -42,6 +43,17 @@ class JupyterScioContext private[scio](
 
   override def run(): ScioExecutionContext = {
     createJar()
+    val dataflowOptions = options.as(classOf[DataflowPipelineOptions])
+    val localArtifacts = dataflowOptions.getFilesToStage() match {
+      case null => Nil
+      case l => l.asScala
+    }
+    val filesToStage = (artifacts ++ List(replJarPath.toString()))
+    println("****FILES-TO-STAGE START")
+    filesToStage.foreach(println(_))
+    println("****FILES-TO-STAGE END")
+
+    dataflowOptions.setFilesToStage(new java.util.ArrayList(filesToStage.asJavaCollection))
     super.run()
   }
 
@@ -50,7 +62,7 @@ class JupyterScioContext private[scio](
     val dir = replApi.compiler.settings.outputDirs.getSingleOutput.get
     try {
       addVirtualDirectoryToJar(dir, "", jarStream)
-      addClasspathDependenciesToJar(jarStream)
+      //addClasspathDependenciesToJar(jarStream)
     }
     finally {
       jarStream.close()

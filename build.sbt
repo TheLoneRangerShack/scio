@@ -1384,14 +1384,14 @@ lazy val `scio-jupyter`: Project = project
       "org.scala-lang" % "scala-compiler" % scalaVersion.value,
       "org.scala-lang.modules" %% "scala-collection-compat" % scalaCollectionCompatVersion,
       "org.slf4j" % "slf4j-api" % slf4jVersion,
-      // runtime
-      "org.apache.beam" % "beam-runners-direct-java" % beamVersion % Runtime,
-      "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % beamVersion % Runtime excludeAll(
+      "org.apache.beam" % "beam-runners-google-cloud-dataflow-java" % beamVersion excludeAll(
         "com.google.cloud.bigdataoss" % "gcsio",
         // remove transitive test dependencies at compile time
         "junit" % "junit",
         "org.hamcrest" % "hamcrest-core"
       ),
+      // runtime
+      "org.apache.beam" % "beam-runners-direct-java" % beamVersion % Runtime,
       "org.slf4j" % "slf4j-simple" % slf4jVersion % Runtime
     ),
     libraryDependencies ++= {
