@@ -27,14 +27,23 @@ import org.apache.beam.sdk.util.MimeTypes
 import org.apache.hadoop.conf.Configuration
 import org.apache.parquet.filter2.compat.FilterCompat
 import org.apache.parquet.filter2.predicate.FilterPredicate
-import org.apache.parquet.hadoop.{ParquetOutputFormat, ParquetReader, ParquetWriter}
+import org.apache.parquet.hadoop.{ParquetReader, ParquetWriter}
 import org.apache.parquet.hadoop.metadata.CompressionCodecName
 
 import java.nio.channels.{ReadableByteChannel, WritableByteChannel}
 
 object ParquetTypeFileOperations {
-  val DefaultCompression = CompressionCodecName.GZIP
+
+  val DefaultCompression = CompressionCodecName.ZSTD
   val DefaultConfiguration: Configuration = null
+
+  // make sure parquet is part of the classpath
+  try {
+    Class.forName("org.apache.parquet.schema.Types");
+  } catch {
+    case e: ClassNotFoundException =>
+      throw new MissingImplementationException("parquet", e);
+  }
 
   def apply[T: Coder: ParquetType](): ParquetTypeFileOperations[T] = apply(DefaultCompression)
 
@@ -118,17 +127,13 @@ private case class ParquetTypeSink[T](
     extends FileIO.Sink[T] {
   @transient private var writer: ParquetWriter[T] = _
 
-  override def open(channel: WritableByteChannel): Unit = {
-    // https://github.com/apache/parquet-mr/tree/master/parquet-hadoop#class-parquetoutputformat
-    val rowGroupSize =
-      conf.get().getLong(ParquetOutputFormat.BLOCK_SIZE, ParquetWriter.DEFAULT_BLOCK_SIZE)
-    writer = pt
-      .writeBuilder(new ParquetOutputFile(channel))
-      .withCompressionCodec(compression)
-      .withConf(conf.get())
-      .withRowGroupSize(rowGroupSize)
-      .build()
-  }
+  override def open(channel: WritableByteChannel): Unit =
+    writer = ParquetUtils.buildWriter(
+      pt
+        .writeBuilder(new ParquetOutputFile(channel)),
+      conf.get(),
+      compression
+    )
 
   override def write(element: T): Unit = writer.write(element)
   override def flush(): Unit = writer.close()

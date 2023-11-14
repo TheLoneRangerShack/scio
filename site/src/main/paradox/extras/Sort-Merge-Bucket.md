@@ -1,7 +1,7 @@
 # Sort Merge Bucket
 
 Sort Merge Bucket is a technique for writing data to file system in deterministic file locations,
-sorted according by some pre-determined key, so that it can later be read in as key groups with
+sorted according to some pre-determined key, so that it can later be read in as key groups with
 no shuffle required. Since each element is assigned a file destination (bucket) based on a hash
 of its join key, we can use the same technique to cogroup multiple Sources as long as they're
 written using the same key and hashing scheme.
@@ -64,14 +64,18 @@ function, and immediately rewrites them using the same bucketing scheme.
 
 ## What kind of data can I write using SMB?
 
-SMB writes are supported for Avro (GenericRecord and SpecificRecord), JSON, Parquet, and Tensorflow records.
-See API bindings in:
+SMB writes are supported for multiple formats:
 
-- @javadoc[AvroSortedBucketIO](org.apache.beam.sdk.extensions.smb.AvroSortedBucketIO)
-- @javadoc[JsonSortedBucketIO](org.apache.beam.sdk.extensions.smb.JsonSortedBucketIO)
-- @javadoc[ParquetAvroSortedBucketIO](org.apache.beam.sdk.extensions.smb.ParquetAvroSortedBucketIO)
-- @javadoc[ParquetTypesSortedBucketIO](org.apache.beam.sdk.extensions.smb.ParquetTypesSortedBucketIO)
-- @javadoc[TensorFlowBucketIO](org.apache.beam.sdk.extensions.smb.TensorFlowBucketIO)
+- Avro (GenericRecord and SpecificRecord) when also depending on `scio-avro`.
+  - @javadoc[AvroSortedBucketIO](org.apache.beam.sdk.extensions.smb.AvroSortedBucketIO)
+- JSON
+  - @javadoc[JsonSortedBucketIO](org.apache.beam.sdk.extensions.smb.JsonSortedBucketIO)
+- Parquet when also depending on  `scio-parquet`
+  - @javadoc[ParquetAvroSortedBucketIO](org.apache.beam.sdk.extensions.smb.ParquetAvroSortedBucketIO)
+  - @javadoc[ParquetTypesSortedBucketIO](org.apache.beam.sdk.extensions.smb.ParquetTypesSortedBucketIO)
+- Tensorflow when also depending on `scio-tensorflow`
+  - @javadoc[TensorFlowBucketIO](org.apache.beam.sdk.extensions.smb.TensorFlowBucketIO)
+
 ## Null keys in SMB datasets
 
 If the key field of one or more PCollection elements is null, those elements will be diverted into a special
@@ -127,6 +131,51 @@ mySchema
     "String".asInstanceOf[Object]
   )
 ```
+
+## Parquet
+
+SMB supports Parquet reads and writes in both Avro and case class formats.
+
+If you're using Parquet-Avro and your schema contains a _logical type_, you'll have to opt in to a logical type _supplier_
+in your Parquet `Configuration` parameter:
+
+```scala mdoc:reset
+import org.apache.avro.specific.SpecificRecordBase
+
+import org.apache.beam.sdk.extensions.smb.{AvroLogicalTypeSupplier, ParquetAvroSortedBucketIO}
+import org.apache.beam.sdk.values.TupleTag
+import org.apache.hadoop.conf.Configuration
+import org.apache.parquet.avro.{AvroDataSupplier, AvroReadSupport, AvroWriteSupport}
+import com.spotify.scio.avro.TestRecord
+
+// Reads
+val readConf = new Configuration()
+readConf.setClass(AvroReadSupport.AVRO_DATA_SUPPLIER, classOf[AvroLogicalTypeSupplier], classOf[AvroDataSupplier])
+
+ParquetAvroSortedBucketIO
+  .read[TestRecord](new TupleTag[TestRecord], classOf[TestRecord])
+  .withConfiguration(readConf)
+
+// Writes
+val writeConf = new Configuration()
+writeConf.setClass(AvroWriteSupport.AVRO_DATA_SUPPLIER, classOf[AvroLogicalTypeSupplier], classOf[AvroDataSupplier])
+
+ParquetAvroSortedBucketIO
+  .write(classOf[String], "myKeyField", classOf[TestRecord])
+  .withConfiguration(writeConf)
+
+// Transforms
+val transformConf = new Configuration()
+transformConf.setClass(AvroReadSupport.AVRO_DATA_SUPPLIER, classOf[AvroLogicalTypeSupplier], classOf[AvroDataSupplier])
+transformConf.setClass(AvroWriteSupport.AVRO_DATA_SUPPLIER, classOf[AvroLogicalTypeSupplier], classOf[AvroDataSupplier])
+
+ParquetAvroSortedBucketIO
+  .transformOutput(classOf[String], "myKeyField", classOf[TestRecord])
+  .withConfiguration(transformConf)
+```
+
+Note that if you're using a non-default Avro version (i.e. Avro 1.11), you'll have to supply a custom logical type supplier
+using Avro 1.11 classes. See @ref:[Logical Types in Parquet](../io/Parquet.md#logical-types) for more information.
 
 ## Tuning parameters for SMB transforms
 

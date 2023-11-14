@@ -10,7 +10,7 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: cache SBT
         uses: coursier/cache-action@v6
       - name: Java 11 setup
@@ -18,11 +18,13 @@ jobs:
         with:
           distribution: temurin
           java-version: 11
-      - run: sbt "; headerCheckAll; javafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck" "; scalafixEnable; scalafixAll --check"
+      - run: > 
+          sbt "; headerCheckAll; javafmtCheckAll; scalafmtCheckAll; scalafmtSbtCheck"
+          "; scalafixEnable; scalafixAll --check"
   scalafix-rules:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: cache SBT
         uses: coursier/cache-action@v6
       - name: Java 11 setup
@@ -32,10 +34,22 @@ jobs:
           java-version: 11
       - working-directory: ./scalafix
         run: sbt test
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: cache SBT
+        uses: coursier/cache-action@v6
+      - name: Java 11 setup
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 11
+      - run: sbt "; undeclaredCompileDependenciesTest; unusedCompileDependenciesTest"
   mimaReport:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: cache SBT
@@ -49,5 +63,5 @@ jobs:
     strategy:
       matrix:
         scala:
-          - 2.12.17
-          - 2.13.8
+          - 2.12.18
+          - 2.13.11

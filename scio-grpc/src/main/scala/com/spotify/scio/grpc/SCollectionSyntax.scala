@@ -27,9 +27,9 @@ import com.spotify.scio.values.SCollection
 import com.twitter.chill.ClosureCleaner
 import io.grpc.Channel
 import io.grpc.stub.{AbstractFutureStub, AbstractStub, StreamObserver}
+import org.apache.commons.lang3.tuple.Pair
 
 import java.lang.{Iterable => JIterable}
-
 import scala.util.Try
 import scala.jdk.CollectionConverters._
 
@@ -40,23 +40,26 @@ class GrpcSCollectionOps[Request](private val self: SCollection[Request]) extend
     clientFactory: Channel => Client,
     maxPendingRequests: Int,
     cacheSupplier: CacheSupplier[Request, Response] = new NoOpCacheSupplier[Request, Response]()
-  )(f: Client => Request => ListenableFuture[Response]): SCollection[(Request, Try[Response])] = {
-    import self.coder
-    val uncurried = (c: Client, r: Request) => f(c)(r)
-    self
-      .parDo(
+  )(f: Client => Request => ListenableFuture[Response]): SCollection[(Request, Try[Response])] =
+    self.transform { in =>
+      import self.coder
+      val cs = ClosureCleaner.clean(channelSupplier)
+      val cf = Functions.serializableFn(clientFactory)
+      val lfn = Functions.serializableBiFn[Client, Request, ListenableFuture[Response]] {
+        (client, request) => f(client)(request)
+      }
+      in.parDo(
         GrpcDoFn
           .newBuilder[Request, Response, Client]()
-          .withChannelSupplier(() => ClosureCleaner.clean(channelSupplier)())
-          .withNewClientFn(Functions.serializableFn(clientFactory))
-          .withLookupFn(Functions.serializableBiFn(uncurried))
+          .withChannelSupplier(() => cs())
+          .withNewClientFn(cf)
+          .withLookupFn(lfn)
           .withMaxPendingRequests(maxPendingRequests)
           .withCacheSupplier(cacheSupplier)
           .build()
-      )
-      .map(kvToTuple)
-      .mapValues(_.asScala)
-  }
+      ).map(kvToTuple)
+        .mapValues(_.asScala)
+    }
 
   def grpcLookupStream[Response: Coder, Client <: AbstractStub[Client]](
     channelSupplier: () => Channel,
@@ -66,28 +69,84 @@ class GrpcSCollectionOps[Request](private val self: SCollection[Request]) extend
       new NoOpCacheSupplier[Request, JIterable[Response]]()
   )(
     f: Client => (Request, StreamObserver[Response]) => Unit
-  ): SCollection[(Request, Try[Iterable[Response]])] = {
+  ): SCollection[(Request, Try[Iterable[Response]])] = self.transform { in =>
     import self.coder
-    val uncurried = (client: Client, request: Request) => {
-      val observer = new StreamObservableFuture[Response]()
-      f(client)(request, observer)
-      observer
+    val cs = ClosureCleaner.clean(channelSupplier)
+    val cf = Functions.serializableFn(clientFactory)
+    val lfn = Functions.serializableBiFn[Client, Request, ListenableFuture[JIterable[Response]]] {
+      (client, request) =>
+        val observer = new StreamObservableFuture[Response]()
+        f(client)(request, observer)
+        observer
     }
-    self
-      .parDo(
-        GrpcDoFn
-          .newBuilder[Request, JIterable[Response], Client]()
-          .withChannelSupplier(() => ClosureCleaner.clean(channelSupplier)())
-          .withNewClientFn(Functions.serializableFn(clientFactory))
-          .withLookupFn(Functions.serializableBiFn(uncurried))
-          .withMaxPendingRequests(maxPendingRequests)
-          .withCacheSupplier(cacheSupplier)
-          .build()
-      )
-      .map(kvToTuple)
+    in.parDo(
+      GrpcDoFn
+        .newBuilder[Request, JIterable[Response], Client]()
+        .withChannelSupplier(() => cs())
+        .withNewClientFn(cf)
+        .withLookupFn(lfn)
+        .withMaxPendingRequests(maxPendingRequests)
+        .withCacheSupplier(cacheSupplier)
+        .build()
+    ).map(kvToTuple)
       .mapValues(_.asScala.map(_.asScala))
   }
 
+  def grpcBatchLookup[
+    BatchRequest,
+    BatchResponse,
+    Response: Coder,
+    Client <: AbstractFutureStub[Client]
+  ](
+    channelSupplier: () => Channel,
+    clientFactory: Channel => Client,
+    batchSize: Int,
+    batchRequestFn: Seq[Request] => BatchRequest,
+    batchResponseFn: BatchResponse => Seq[(String, Response)],
+    idExtractorFn: Request => String,
+    maxPendingRequests: Int,
+    cacheSupplier: CacheSupplier[String, Response] = new NoOpCacheSupplier[String, Response]()
+  )(
+    f: Client => BatchRequest => ListenableFuture[BatchResponse]
+  ): SCollection[(Request, Try[Response])] = self.transform { in =>
+    import self.coder
+    val cleanedChannelSupplier = ClosureCleaner.clean(channelSupplier)
+    val serializableClientFactory = Functions.serializableFn(clientFactory)
+    val serializableLookupFn =
+      Functions.serializableBiFn[Client, BatchRequest, ListenableFuture[BatchResponse]] {
+        (client, request) => f(client)(request)
+      }
+
+    val serializableBatchRequestFn =
+      Functions.serializableFn[java.util.List[Request], BatchRequest] { inputs =>
+        batchRequestFn(inputs.asScala.toSeq)
+      }
+
+    val serializableBatchResponseFn =
+      Functions.serializableFn[BatchResponse, java.util.List[Pair[String, Response]]] {
+        batchResponse =>
+          batchResponseFn(batchResponse).map { case (input, output) =>
+            Pair.of(input, output)
+          }.asJava
+      }
+    val serializableIdExtractorFn = Functions.serializableFn(idExtractorFn)
+
+    in.parDo(
+      GrpcBatchDoFn
+        .newBuilder[Request, BatchRequest, BatchResponse, Response, Client]()
+        .withChannelSupplier(() => cleanedChannelSupplier())
+        .withNewClientFn(serializableClientFactory)
+        .withLookupFn(serializableLookupFn)
+        .withMaxPendingRequests(maxPendingRequests)
+        .withBatchSize(batchSize)
+        .withBatchRequestFn(serializableBatchRequestFn)
+        .withBatchResponseFn(serializableBatchResponseFn)
+        .withIdExtractorFn(serializableIdExtractorFn)
+        .withCacheSupplier(cacheSupplier)
+        .build()
+    ).map(kvToTuple _)
+      .mapValues(_.asScala)
+  }
 }
 
 trait SCollectionSyntax {

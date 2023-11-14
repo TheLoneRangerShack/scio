@@ -35,7 +35,7 @@ import org.apache.beam.sdk.{coders => bcoders}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
-private object VoidCoder extends AtomicCoder[Void] {
+private[coders] object VoidCoder extends AtomicCoder[Void] {
   override def encode(value: Void, outStream: OutputStream): Unit = ()
 
   override def decode(inStream: InputStream): Void = ???
@@ -147,6 +147,12 @@ trait JavaCoders extends JavaBeanCoders {
 
   implicit def jSqlTimestamp: Coder[java.sql.Timestamp] =
     Coder.xmap(jInstantCoder)(java.sql.Timestamp.from, _.toInstant())
+
+  implicit def jSqlDate: Coder[java.sql.Date] =
+    Coder.xmap(jLocalDateCoder)(java.sql.Date.valueOf, _.toLocalDate())
+
+  implicit def jSqlTime: Coder[java.sql.Time] =
+    Coder.xmap(jLocalTimeCoder)(java.sql.Time.valueOf, _.toLocalTime())
 
   implicit def coderJEnum[E <: java.lang.Enum[E]: ClassTag]: Coder[E] =
     Coder.xmap(Coder[String])(

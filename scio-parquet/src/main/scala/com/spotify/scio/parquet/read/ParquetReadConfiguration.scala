@@ -16,7 +16,12 @@
 
 package com.spotify.scio.parquet.read
 
+import org.apache.beam.sdk.options.{ExperimentalOptions, PipelineOptions}
+import org.apache.hadoop.conf.Configuration
+import org.slf4j.LoggerFactory
+
 object ParquetReadConfiguration {
+  private val log = LoggerFactory.getLogger(getClass)
 
   // Key
   val SplitGranularity = "scio.parquet.read.splitgranularity"
@@ -36,4 +41,30 @@ object ParquetReadConfiguration {
   // SplittableDoFn
   val UseSplittableDoFn = "scio.parquet.read.useSplittableDoFn"
   private[scio] val UseSplittableDoFnDefault = false
+
+  // Row Group API (note: this setting is only supported for SplittableDoFn-based reads)
+  val FilterGranularity = "scio.parquet.read.filterGranularity"
+
+  // Use Parquet's readNextFilteredRowGroup() API, which applies filters to entire pages within each row group
+  val FilterGranularityPage = "page"
+
+  // Use Parquet's readNextRowGroup() API, which applies filters per-record within each page
+  val FilterGranularityRecord = "record"
+
+  private[scio] def getUseSplittableDoFn(conf: Configuration, opts: PipelineOptions): Boolean = {
+    Option(conf.get(UseSplittableDoFn)) match {
+      case Some(v) => v.toBoolean
+      case None if dataflowRunnerV2Enabled(opts) =>
+        log.info(
+          "Defaulting to SplittableDoFn-based Parquet read as Dataflow Runner V2 is enabled. To opt out, " +
+            "set `scio.parquet.read.useSplittableDoFn -> false` in your read Configuration."
+        )
+        true
+      case None =>
+        UseSplittableDoFnDefault
+    }
+  }
+
+  private def dataflowRunnerV2Enabled(opts: PipelineOptions): Boolean =
+    Option(opts.as(classOf[ExperimentalOptions]).getExperiments).exists(_.contains("use_runner_v2"))
 }
