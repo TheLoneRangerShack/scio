@@ -44,7 +44,7 @@ class JupyterScioContext private[scio](
 
   override def run(): ScioExecutionContext = {
     createJar()
-    val dataflowOptions = options.as(classOf[DataflowPipelineOptions])
+    /*val dataflowOptions = options.as(classOf[DataflowPipelineOptions])
     val localArtifacts = dataflowOptions.getFilesToStage() match {
       case null => Nil
       case l => l.asScala
@@ -54,7 +54,7 @@ class JupyterScioContext private[scio](
     filesToStage.foreach(println(_))
     println("****FILES-TO-STAGE END")
 
-    dataflowOptions.setFilesToStage(new java.util.ArrayList(filesToStage.asJavaCollection))
+    dataflowOptions.setFilesToStage(new java.util.ArrayList(filesToStage.asJavaCollection))*/
     super.run()
   }
 

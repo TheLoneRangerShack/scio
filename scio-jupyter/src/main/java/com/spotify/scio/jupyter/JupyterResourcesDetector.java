@@ -30,7 +30,7 @@ public class JupyterResourcesDetector implements PipelineResourcesDetector {
             .scan(1)
             .getClasspathFiles();
 
-    /*
+
     return classpathContents.stream().map(File::getAbsolutePath)
         .filter(name -> !name.contains("-sources.jar"))
         .filter(name -> !name.contains("ammonite"))
@@ -40,8 +40,7 @@ public class JupyterResourcesDetector implements PipelineResourcesDetector {
         .filter(name -> !name.contains("coursier"))
         .filter(name -> !name.contains("launcher.jar"))
         .collect(Collectors.toList());
-     */
-    return new ArrayList<>();
+    //return new ArrayList<>();
   }
 
   public static class JupyterResourcesDetectorFactory implements PipelineResourcesDetector.Factory {
